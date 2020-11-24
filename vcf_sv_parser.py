@@ -101,10 +101,7 @@ class SvVcfData(object):
         :return:
         :rtype:
         """
-        if alt[0].orientation:
-            return '+'
-        else:
-            return '-'
+        return alt[0].orientation
 
     def _get_strands(self, mate1, mate2):
         if self.caller == 'lumpy':
@@ -153,7 +150,7 @@ class SvVcfData(object):
             'chromosome_2': mate2['chrom'],
             'position_2': mate2['pos'],
             'strand_2': strand_2,
-            'svtype': mate1['SVTYPE']
+            'type': mate1['SVTYPE']
         }
 
         return outdata
@@ -173,24 +170,6 @@ class SvVcfData(object):
                     continue
 
             yield call
-
-    def _classify_calls(self, data):
-
-        data['type'] = None
-        data.loc[(data['position_1'] < data['position_2']) & (data['strand_1'] == '+') & (data['strand_2'] == '-'), 'type'] = 'deletion'
-        data.loc[(data['position_2'] < data['position_1']) & (data['strand_2'] == '+') & (data['strand_1'] == '-'), 'type'] = 'deletion'
-        data.loc[(data['position_1'] < data['position_2']) & (data['strand_1'] == '-') & (data['strand_2'] == '+'), 'type'] = 'duplication'
-        data.loc[(data['position_2'] < data['position_1']) & (data['strand_2'] == '-') & (data['strand_1'] == '+'), 'type'] = 'duplication'
-        data.loc[(data['strand_1'] == data['strand_2']), 'type'] = 'inversion'
-        data.loc[(data['chromosome_1'] != data['chromosome_2']), 'type'] = 'translocation'
-        # then for size...
-        data['length'] = (data['position_1'] - data['position_2']).abs()
-        data['size_class'] = pd.cut(data['length'], [0, 1e4, 1e6, 1e10], labels=['S', 'M', 'L'])
-
-        data.loc[(data['type'] == 'translocation'), 'length'] = float('inf')
-        data.loc[(data['type'] == 'translocation'), 'size_class'] = 'L'
-
-        return data
 
     def fetch(self):
         records = self._parse_vcf()
@@ -213,89 +192,5 @@ class SvVcfData(object):
 
         data['breakpoint_id'] = data['breakpoint_id'].astype(str) + '_' + data['caller']
 
-        data = self._classify_calls(data)
-
         return data
-
-
-
-def parse_destruct(filepath):
-    df = pd.read_csv(filepath, sep='\t')
-    df = df[['chromosome_1','position_1', 'strand_1', 'chromosome_2','position_2', 'strand_2', 'type']]
-
-    df.chromosome_1 = df['chromosome_1'].astype(str)
-    df.chromosome_2 = df['chromosome_2'].astype(str)
-
-    return df
-
-
-
-raw_svaba = "../rawdata/svaba/output/out.svaba.somatic.sv.vcf.gz"
-data = SvVcfData(raw_svaba).as_data_frame()
-data.to_csv("svaba_parsed_raw.csv.gz", index=False)
-
-raw_gridss = "../rawdata/gridss/calls.vcf.gz"
-data = SvVcfData(raw_gridss).as_data_frame()
-data.to_csv("gridss_parsed_raw.csv.gz", index=False)
-
-raw_lumpy = "../rawdata/wgs/output/breakpoints/SA1256PP/SA1256PP_lumpy.vcf"
-data = SvVcfData(raw_lumpy).as_data_frame()
-data.to_csv("lumpy_parsed_raw.csv.gz", index=False)
-
-raw_destruct = "../rawdata/wgs/output/breakpoints/SA1256PP/SA1256PP_destruct_breakpoints.csv.gz"
-data = parse_destruct(raw_destruct)
-data.to_csv("destruct_parsed_raw.csv.gz", index=False)
-
-#######################
-trim_svaba = "../trimming/svaba/output/out.svaba.somatic.sv.vcf.gz"
-data = SvVcfData(trim_svaba).as_data_frame()
-data.to_csv("svaba_parsed_trimming.csv.gz", index=False)
-
-trim_gridss = "../trimming/gridss/calls.vcf.gz"
-data = SvVcfData(trim_gridss).as_data_frame()
-data.to_csv("gridss_parsed_trimming.csv.gz", index=False)
-
-trim_lumpy = "../trimming/wgs/output/breakpoints/SA1256PP/SA1256PP_lumpy.vcf"
-data = SvVcfData(trim_lumpy).as_data_frame()
-data.to_csv("lumpy_parsed_trimming.csv.gz", index=False)
-
-trim_destruct = "../trimming/wgs/output/breakpoints/SA1256PP/SA1256PP_destruct_breakpoints.csv.gz"
-data = parse_destruct(trim_destruct)
-data.to_csv("destruct_parsed_trimming.csv.gz", index=False)
-
-
-
-################
-prim_svaba = "../primary_only/svaba/output/out.svaba.somatic.sv.vcf.gz"
-data = SvVcfData(prim_svaba).as_data_frame()
-data.to_csv("svaba_parsed_primary_only.csv.gz", index=False)
-
-prim_gridss = "../primary_only/gridss/calls.vcf.gz"
-data = SvVcfData(prim_gridss).as_data_frame()
-data.to_csv("gridss_parsed_primary_only.csv.gz", index=False)
-
-prim_lumpy = "../primary_only/wgs/output/breakpoints/SA1256PP/SA1256PP_lumpy.vcf"
-data = SvVcfData(prim_lumpy).as_data_frame()
-data.to_csv("lumpy_parsed_primary_only.csv.gz", index=False)
-
-prim_destruct = "../primary_only/wgs/output/breakpoints/SA1256PP/SA1256PP_destruct_breakpoints.csv.gz"
-data = parse_destruct(prim_destruct)
-data.to_csv("destruct_parsed_primary_only.csv.gz", index=False)
-
-##################
-trim_prim_svaba = "../trimming_primary_only/svaba/output/out.svaba.somatic.sv.vcf.gz"
-data = SvVcfData(trim_prim_svaba).as_data_frame()
-data.to_csv("svaba_parsed_trimming_primary_only.csv.gz", index=False)
-
-trim_prim_gridss = "../trimming_primary_only/gridss/calls.vcf.gz"
-data = SvVcfData(trim_prim_gridss).as_data_frame()
-data.to_csv("gridss_parsed_trimming_primary_only.csv.gz", index=False)
-
-trim_prim_lumpy = "../trimming_primary_only/wgs/output/breakpoints/SA1256PP/SA1256PP_lumpy.vcf"
-data = SvVcfData(trim_prim_lumpy).as_data_frame()
-data.to_csv("lumpy_parsed_trimming_primary_only.csv.gz", index=False)
-
-trim_prim_destruct = "../trimming_primary_only/wgs/output/breakpoints/SA1256PP/SA1256PP_destruct_breakpoints.csv.gz"
-data = parse_destruct(trim_prim_destruct)
-data.to_csv("destruct_parsed_trimming_primary_only.csv.gz", index=False)
 
