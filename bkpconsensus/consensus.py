@@ -91,4 +91,8 @@ consensus(
     'consensus.csv.gz'
 )
 
+def main():
+    print('main')
+
+
 
