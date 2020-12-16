@@ -1,19 +1,25 @@
+import fire
 import pandas as pd
-from breakpoint_db import BreakpointDatabase
+from bkpconsensus.breakpoint_db import BreakpointDatabase
 from single_cell.utils import csvutils
-from vcf_sv_parser import SvVcfData
+from bkpconsensus.vcf_sv_parser import SvVcfData
 
 
 def read_destruct(destruct_calls):
     df = csvutils.CsvInput(destruct_calls).read_csv()
-    df = df[
-        ['prediction_id', 'chromosome_1', 'position_1', 'strand_1', 'chromosome_2', 'position_2', 'strand_2', 'type']]
-    df['breakpoint_id'] = df.prediction_id
-    del df['prediction_id']
-    df['caller'] = 'destruct'
-
-    df['breakpoint_id'] = df['breakpoint_id'].astype(str) + '_' + df['caller']
+    destruct_cols = ['prediction_id', 'chromosome_1', 'position_1', 'strand_1', 'chromosome_2', 'position_2', 'strand_2', 'type']
+    df = df[destruct_cols]
+    df['breakpoint_id'] = df['prediction_id']
     return df
+
+
+def read_consensus(filename):
+    try:
+        data = pd.read_csv(filename, sep=',', compression=None, converters={'chromosome_1': str, 'chromosome_2': str})
+        data['breakpoint_id'] = data['prediction_id']
+    except UnicodeDecodeError:
+        data = pd.read_csv(filename, sep=',', compression='gzip', converters={'chromosome_1': str, 'chromosome_2': str})
+    return data
 
 
 def check_common(x, df_db, calls):
@@ -46,7 +52,7 @@ def get_common_calls(df, df_db):
     return new_groups
 
 
-def consensus(destruct_calls, lumpy_calls, svaba_calls, gridss_calls, consensus_calls):
+def consensusmulti(destruct_calls, lumpy_calls, svaba_calls, gridss_calls, consensus_calls):
     allcalls = [
         read_destruct(destruct_calls),
         SvVcfData(lumpy_calls).as_data_frame(),
@@ -83,16 +89,50 @@ def consensus(destruct_calls, lumpy_calls, svaba_calls, gridss_calls, consensus_
 
     outdata.to_csv(consensus_calls, index=False)
 
-consensus(
-    "../wgs/output/breakpoints/SA1256PP/SA1256PP_destruct_breakpoints.csv.gz",
-    '../wgs/output/breakpoints/SA1256PP/SA1256PP_lumpy.vcf',
-    '../svaba/output/out.svaba.somatic.sv.vcf.gz',
-    '../gridss/calls.vcf.gz',
-    'consensus.csv.gz'
-)
+
+def consensus(filename1, type1, filename2, type2, out_filename, min_dist=200):
+    if type1 == 'destruct':
+        data1 = read_destruct(filename1)
+    elif type1 == 'consensus':
+        data1 = read_consensus(filename1)
+    elif type1 in ('lumpy', 'svaba', 'gridss'):
+        data1 = SvVcfData(filename1).as_data_frame()
+    else:
+        raise ValueError(f'unrecognized type {type1}')
+
+    if 'breakpoint_id' not in data1:
+        raise ValueError('breakpoint_id not in data1')
+
+    if type2 == 'destruct':
+        data2 = read_destruct(filename2)
+    elif type2 == 'consensus':
+        data2 = read_consensus(filename2)
+    elif type2 in ('lumpy', 'svaba', 'gridss'):
+        data2 = SvVcfData(filename2).as_data_frame()
+    else:
+        raise ValueError(f'unrecognized type {type2}')
+
+    if 'breakpoint_id' not in data2:
+        raise ValueError('breakpoint_id not in data2')
+
+    db1 = BreakpointDatabase(data1)
+
+    results = []
+    for idx, row in data2.iterrows():
+        for match_id in db1.query(row, min_dist):
+            results.append({
+                'breakpoint_id_1': match_id,
+                'breakpoint_id_2': row['breakpoint_id']})
+    results = pd.DataFrame(results)
+
+    if results.empty:
+        results = pd.DataFrame(columns=['breakpoint_id_1', 'breakpoint_id_2'])
+
+    results.to_csv(out_filename, index=False)
+
 
 def main():
-    print('main')
+    fire.Fire(consensus)
 
 
 

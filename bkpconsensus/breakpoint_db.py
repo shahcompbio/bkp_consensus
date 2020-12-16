@@ -3,7 +3,7 @@ import collections
 
 
 class BreakpointDatabase(object):
-    def __init__(self, breakpoints, id_col='breakpoint_id'):
+    def __init__(self, breakpoints, id_col='prediction_id'):
         self.positions = collections.defaultdict(list)
         self.break_ids = collections.defaultdict(set)
 
@@ -17,8 +17,6 @@ class BreakpointDatabase(object):
             self.positions[key] = sorted(self.positions[key])
 
     def query(self, row, extend=0):
-        exclusion = row['breakpoint_id']
-        # raise Exception(row)
         matched_ids = list()
 
         for side in ('1', '2'):
@@ -43,11 +41,9 @@ class BreakpointDatabase(object):
         for matched_id_1, dist_1 in matched_ids[0]:
             for matched_id_2, dist_2 in matched_ids[1]:
                 if matched_id_1[0] == matched_id_2[0] and matched_id_1[1] != matched_id_2[1]:
-                    if not matched_id_1[0] == exclusion:
+                    matched_ids_bypos.append((dist_1 + dist_2, matched_id_1[0]))
 
-                        matched_ids_bypos.append((dist_1 + dist_2, matched_id_1[0]))
-
-        ids = set([v[1] for v in matched_ids_bypos] + [exclusion])
+        ids = set([v[1] for v in matched_ids_bypos])
         return sorted(ids)
 
 

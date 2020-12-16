@@ -101,7 +101,7 @@ class SvVcfData(object):
         :return:
         :rtype:
         """
-        return alt[0].orientation
+        return ('+', '-')[alt[0].orientation]
 
     def _get_strands(self, mate1, mate2):
         if self.caller == 'lumpy':
@@ -187,9 +187,7 @@ class SvVcfData(object):
 
         data = pd.DataFrame(data)
         data['caller'] = self.caller
-
         data['breakpoint_id'] = data.index
-
         data['breakpoint_id'] = data['breakpoint_id'].astype(str) + '_' + data['caller']
 
         return data
