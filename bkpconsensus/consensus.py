@@ -7,9 +7,20 @@ from bkpconsensus.vcf_sv_parser import SvVcfData
 
 def read_destruct(destruct_calls):
     df = csvutils.CsvInput(destruct_calls).read_csv()
-    destruct_cols = ['prediction_id', 'chromosome_1', 'position_1', 'strand_1', 'chromosome_2', 'position_2', 'strand_2', 'type']
-    df = df[destruct_cols]
     df['breakpoint_id'] = df['prediction_id']
+    return df
+
+
+def read_lumpycsv(lumpy_filename):
+    df = csvutils.CsvInput(lumpy_filename).read_csv()
+    df = df.rename(columns={
+        'chrom1': 'chromosome_1',
+        'strand1': 'strand_1',
+        'chrom2': 'chromosome_2',
+        'strand2': 'strand_2',
+    })
+    df['position_1'] = 0.5 * (df['confidence_interval_start1'] + df['confidence_interval_end1'])
+    df['position_2'] = 0.5 * (df['confidence_interval_start2'] + df['confidence_interval_end2'])
     return df
 
 
@@ -90,27 +101,26 @@ def consensusmulti(destruct_calls, lumpy_calls, svaba_calls, gridss_calls, conse
     outdata.to_csv(consensus_calls, index=False)
 
 
-def consensus(filename1, type1, filename2, type2, out_filename, min_dist=200):
-    if type1 == 'destruct':
-        data1 = read_destruct(filename1)
-    elif type1 == 'consensus':
-        data1 = read_consensus(filename1)
-    elif type1 in ('lumpy', 'svaba', 'gridss'):
-        data1 = SvVcfData(filename1).as_data_frame()
+def read_sv(filename, type_):
+    if type_ == 'destruct':
+        data = read_destruct(filename)
+    elif type_ == 'lumpycsv':
+        data = read_lumpycsv(filename)
+    elif type_ == 'consensus':
+        data = read_consensus(filename)
+    elif type_ in ('lumpy', 'svaba', 'gridss'):
+        data = SvVcfData(filename).as_data_frame()
     else:
-        raise ValueError(f'unrecognized type {type1}')
+        raise ValueError(f'unrecognized type {type_}')
+    return data
+
+
+def consensus(filename1, type1, filename2, type2, out_filename, min_dist=200):
+    data1 = read_sv(filename1, type1)
+    data2 = read_sv(filename2, type2)
 
     if 'breakpoint_id' not in data1:
         raise ValueError('breakpoint_id not in data1')
-
-    if type2 == 'destruct':
-        data2 = read_destruct(filename2)
-    elif type2 == 'consensus':
-        data2 = read_consensus(filename2)
-    elif type2 in ('lumpy', 'svaba', 'gridss'):
-        data2 = SvVcfData(filename2).as_data_frame()
-    else:
-        raise ValueError(f'unrecognized type {type2}')
 
     if 'breakpoint_id' not in data2:
         raise ValueError('breakpoint_id not in data2')

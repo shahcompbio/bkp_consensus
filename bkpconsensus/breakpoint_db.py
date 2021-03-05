@@ -3,7 +3,7 @@ import collections
 
 
 class BreakpointDatabase(object):
-    def __init__(self, breakpoints, id_col='prediction_id'):
+    def __init__(self, breakpoints, id_col='breakpoint_id'):
         self.positions = collections.defaultdict(list)
         self.break_ids = collections.defaultdict(set)
 
